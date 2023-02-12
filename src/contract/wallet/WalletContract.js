@@ -1,6 +1,6 @@
-const {Contract} = require("../index.js");
-const {Cell} = require("../../boc");
-const {nacl, stringToBytes, Address, BN} = require("../../utils");
+const { Contract } = require("../index.js");
+const { Cell } = require("../../boc");
+const { nacl, stringToBytes, Address, BN } = require("../../utils");
 
 /**
  * Abstract standard wallet class
@@ -42,6 +42,8 @@ class WalletContract extends Contract {
          * @param secretKey {Uint8Array}
          */
         this.deploy = (secretKey) => Contract.createMethod(provider, this.createInitExternalMessage(secretKey));
+
+        this.deployWithoutSK = (InitExternalMessage) => Contract.createMethod(provider, InitExternalMessage);
     }
 
     getName() {
@@ -83,7 +85,7 @@ class WalletContract extends Contract {
             const keyPair = nacl.sign.keyPair.fromSecretKey(secretKey)
             this.options.publicKey = keyPair.publicKey;
         }
-        const {stateInit, address, code, data} = await this.createStateInit();
+        const { stateInit, address, code, data } = await this.createStateInit();
 
         const signingMessage = this.createSigningMessage();
         const signature = nacl.sign.detached(await signingMessage.hash(), secretKey);
@@ -203,6 +205,132 @@ class WalletContract extends Contract {
 
         return this.createExternalMessage(signingMessage, secretKey, seqno, dummySignature);
     }
+
+
+    /**
+     * External message for initialization
+     * 
+     * 
+     */
+    async createInitExternalMessageWithoutSecretKey() {
+
+        const { stateInit, address, code, data } = await this.createStateInit();
+
+        const signingMessage = this.createSigningMessage();
+        return await signingMessage.hash();
+    }
+
+    async signInitExternalMessage(signature) {
+        const { stateInit, address, code, data } = await this.createStateInit();
+        const signingMessage = this.createSigningMessage();
+
+        const body = new Cell();
+        body.bits.writeBytes(signature);
+        body.writeCell(signingMessage);
+
+        const header = Contract.createExternalMessageHeader(address);
+        const externalMessage = Contract.createCommonMsgInfo(header, stateInit, body);
+
+        return {
+            address: address,
+            message: externalMessage,
+
+            body,
+            signingMessage,
+            stateInit,
+            code,
+            data,
+        };
+    }
+
+
+    async createTransferMessageWithoutSecretKey(
+        address,
+        amount,
+        seqno,
+        payload = "",
+        sendMode = 3,
+        dummySignature = false,
+        stateInit = null,
+        expireAt = undefined
+    ) {
+        let payloadCell = new Cell();
+        if (payload) {
+            if (payload.refs) { // is Cell
+                payloadCell = payload;
+            } else if (typeof payload === 'string') {
+                if (payload.length > 0) {
+                    payloadCell.bits.writeUint(0, 32);
+                    payloadCell.bits.writeString(payload);
+                }
+            } else {
+                payloadCell.bits.writeBytes(payload)
+            }
+        }
+
+        const orderHeader = Contract.createInternalMessageHeader(new Address(address), new BN(amount));
+        const order = Contract.createCommonMsgInfo(orderHeader, stateInit, payloadCell);
+        const signingMessage = this.createSigningMessage(seqno, expireAt);
+        signingMessage.bits.writeUint8(sendMode);
+        signingMessage.refs.push(order);
+
+        return (await signingMessage.hash());
+        //return this.createExternalMessage(signingMessage, secretKey, seqno, dummySignature);
+
+
+    }
+
+    async signTransferMessage(signature, address, amount, seqno, payload,sendMode) {
+        let payloadCell = new Cell();
+        if (payload) {
+            if (payload.refs) { // is Cell
+                payloadCell = payload;
+            } else if (typeof payload === 'string') {
+                if (payload.length > 0) {
+                    payloadCell.bits.writeUint(0, 32);
+                    payloadCell.bits.writeString(payload);
+                }
+            } else {
+                payloadCell.bits.writeBytes(payload)
+            }
+        }
+
+        const orderHeader = Contract.createInternalMessageHeader(new Address(address), new BN(amount));
+        const order = Contract.createCommonMsgInfo(orderHeader, null, payloadCell);
+        const signingMessage = this.createSigningMessage(seqno, undefined);
+        signingMessage.bits.writeUint8(3);
+        signingMessage.refs.push(order);
+
+        const body = new Cell();
+        body.bits.writeBytes(signature);
+        body.writeCell(signingMessage);
+
+        let stateInit = null, code = null, data = null;
+
+        if (seqno === 0) {  // 说明不需要提前部署钱包
+            const deploy = await this.createStateInit();
+            stateInit = deploy.stateInit;
+            code = deploy.code;
+            data = deploy.data;
+        }
+
+        const selfAddress = await this.getAddress();
+        const header = Contract.createExternalMessageHeader(selfAddress);
+        const resultMessage = Contract.createCommonMsgInfo(header, stateInit, body);
+
+        return {
+            address: selfAddress,
+            message: resultMessage, // old wallet_send_generate_external_message
+
+            body: body,
+            signature: signature,
+            signingMessage: signingMessage,
+
+            stateInit,
+            code,
+            data,
+        };
+    }
 }
 
-module.exports = {WalletContract};
+module.exports = { WalletContract };
