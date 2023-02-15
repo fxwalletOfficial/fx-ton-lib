@@ -1,5 +1,5 @@
 {
-  "name": "tonweb",
+  "name": "fx_tonweb",
   "version": "0.0.59",
   "description": "TonWeb - JavaScript API for TON blockchain",
   "main": "src/index.js",

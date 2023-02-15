@@ -38,7 +38,7 @@ class WalletV4ContractR2 extends WalletContract {
      */
     createSigningMessage(seqno, expireAt, withoutOp) {
         seqno = seqno || 0;
-        expireAt = expireAt || (Math.floor(Date.now() / 1e3) + 60);
+        expireAt = expireAt || (Math.floor(Date.now() / 1e3) + 600);
         const message = new Cell();
         message.bits.writeUint(this.options.walletId, 32);
         if (seqno === 0) {
