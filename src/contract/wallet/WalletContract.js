@@ -280,7 +280,7 @@ class WalletContract extends Contract {
 
     }
 
-    async signTransferMessage(signature, address, amount, seqno, payload,sendMode,expireAt) {
+    async signTransferMessage(publicKey, signature, address, amount, seqno, payload,sendMode,expireAt) {
         let payloadCell = new Cell();
         if (payload) {
             if (payload.refs) { // is Cell
@@ -308,6 +308,9 @@ class WalletContract extends Contract {
         let stateInit = null, code = null, data = null;
 
         if (seqno === 0) {  // 说明不需要提前部署钱包
+            if (!this.options.publicKey) {
+                this.options.publicKey = publicKey;
+            }
             const deploy = await this.createStateInit();
             stateInit = deploy.stateInit;
             code = deploy.code;
