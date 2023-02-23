@@ -245,6 +245,7 @@ class WalletContract extends Contract {
 
 
     async createTransferMessageWithoutSecretKey(
+        publicKey,
         address,
         amount,
         seqno,
@@ -268,19 +269,27 @@ class WalletContract extends Contract {
             }
         }
 
+        if (seqno === 0) {  
+            if (!this.options.publicKey) {
+                this.options.publicKey = publicKey;
+            }
+            const deploy = await this.createStateInit();
+            stateInit = deploy.stateInit;
+
+        }
+       
         const orderHeader = Contract.createInternalMessageHeader(new Address(address), new BN(amount));
         const order = Contract.createCommonMsgInfo(orderHeader, stateInit, payloadCell);
         const signingMessage = this.createSigningMessage(seqno, expireAt);
         signingMessage.bits.writeUint8(sendMode);
         signingMessage.refs.push(order);
-
         return (await signingMessage.hash());
         //return this.createExternalMessage(signingMessage, secretKey, seqno, dummySignature);
 
 
     }
 
-    async signTransferMessage(publicKey, signature, address, amount, seqno, payload,sendMode,expireAt,stateInit = null) {
+    async signTransferMessage(publicKey, signature, address, amount, seqno, payload,sendMode,expireAt) {
         let payloadCell = new Cell();
         if (payload) {
             if (payload.refs) { // is Cell
@@ -295,16 +304,6 @@ class WalletContract extends Contract {
             }
         }
 
-        const orderHeader = Contract.createInternalMessageHeader(new Address(address), new BN(amount));
-        const order = Contract.createCommonMsgInfo(orderHeader, stateInit, payloadCell);
-        const signingMessage = this.createSigningMessage(seqno, expireAt);
-        signingMessage.bits.writeUint8(sendMode);
-        signingMessage.refs.push(order);
-
-        const body = new Cell();
-        body.bits.writeBytes(signature);
-        body.writeCell(signingMessage);
-
         let stateInit = null, code = null, data = null;
 
         if (seqno === 0) {  // 说明不需要提前部署钱包
@@ -316,6 +315,17 @@ class WalletContract extends Contract {
             code = deploy.code;
             data = deploy.data;
         }
+
+        const orderHeader = Contract.createInternalMessageHeader(new Address(address), new BN(amount));
+        const order = Contract.createCommonMsgInfo(orderHeader, stateInit, payloadCell);
+        const signingMessage = this.createSigningMessage(seqno, expireAt);
+        signingMessage.bits.writeUint8(sendMode);
+        signingMessage.refs.push(order);
+        const body = new Cell();
+        body.bits.writeBytes(signature);
+        body.writeCell(signingMessage);
+
+
 
         const selfAddress = await this.getAddress();
         const header = Contract.createExternalMessageHeader(selfAddress);
