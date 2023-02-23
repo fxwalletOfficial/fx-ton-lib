@@ -280,7 +280,7 @@ class WalletContract extends Contract {
 
     }
 
-    async signTransferMessage(publicKey, signature, address, amount, seqno, payload,sendMode,expireAt) {
+    async signTransferMessage(publicKey, signature, address, amount, seqno, payload,sendMode,expireAt,stateInit = null) {
         let payloadCell = new Cell();
         if (payload) {
             if (payload.refs) { // is Cell
@@ -296,7 +296,7 @@ class WalletContract extends Contract {
         }
 
         const orderHeader = Contract.createInternalMessageHeader(new Address(address), new BN(amount));
-        const order = Contract.createCommonMsgInfo(orderHeader, null, payloadCell);
+        const order = Contract.createCommonMsgInfo(orderHeader, stateInit, payloadCell);
         const signingMessage = this.createSigningMessage(seqno, expireAt);
         signingMessage.bits.writeUint8(sendMode);
         signingMessage.refs.push(order);
