@@ -1,5 +1,5 @@
 {
-  "name": "fx_tonweb",
+  "name": "fx-ton-lib",
   "version": "0.0.64",
   "description": "TonWeb - JavaScript API for TON blockchain",
   "main": "src/index.js",
